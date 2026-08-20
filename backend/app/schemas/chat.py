@@ -37,6 +37,7 @@ class ChatRequestMetadata(BaseModel):
     """
 
     cacheable: bool = True
+    task_type: str | None = None
 
 
 class ChatCompletionRequest(BaseModel):

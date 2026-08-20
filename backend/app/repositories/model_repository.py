@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.llm_model import LLMModel
+from app.models.provider import Provider
 
 
 class ModelRepository:
@@ -22,3 +23,12 @@ class ModelRepository:
             .options(selectinload(LLMModel.provider))
         )
         return result.scalars().all()
+
+    async def get_by_name_and_provider(self, name: str, provider_name: str) -> LLMModel | None:
+        result = await self.session.execute(
+            select(LLMModel)
+            .join(Provider, LLMModel.provider_id == Provider.id)
+            .where(LLMModel.name == name, Provider.name == provider_name)
+            .options(selectinload(LLMModel.provider))
+        )
+        return result.scalar_one_or_none()
