@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str
     cache_ttl_seconds: int = 3600
+    cache_temperature_threshold: float = 0.0
 
     # LLM Providers
     openai_api_key: str | None = None

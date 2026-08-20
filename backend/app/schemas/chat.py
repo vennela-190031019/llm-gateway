@@ -30,11 +30,21 @@ class FinishReason(StrEnum):
     TOOL_CALLS = "tool_calls"
 
 
+class ChatRequestMetadata(BaseModel):
+    """Request-level flags that don't affect the completion output itself.
+
+    Kept out of the cache key on purpose — see app.services.cache.
+    """
+
+    cacheable: bool = True
+
+
 class ChatCompletionRequest(BaseModel):
     model: str
     messages: list[ChatMessage] = Field(min_length=1)
     temperature: float = 1.0
     max_tokens: int | None = None
+    metadata: ChatRequestMetadata = Field(default_factory=ChatRequestMetadata)
 
 
 class ChatCompletionResponse(BaseModel):
@@ -45,6 +55,7 @@ class ChatCompletionResponse(BaseModel):
     output_tokens: int
     finish_reason: FinishReason
     latency_ms: float
+    cached: bool = False
 
 
 class ChatCompletionChunk(BaseModel):

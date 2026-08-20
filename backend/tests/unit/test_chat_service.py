@@ -15,17 +15,23 @@ from app.services.chat_service import ChatCompletionService
 from app.services.fallback import AllProvidersExhaustedError, FallbackExecutor
 from app.services.router import ModelRouter
 
-from .fakes import FakeProvider, make_response
+from .fakes import FakeProvider, make_fake_cache_service, make_response
 
 
-def _request(model: str) -> ChatCompletionRequest:
+def _request(model: str, *, temperature: float = 1.0) -> ChatCompletionRequest:
     return ChatCompletionRequest(
-        model=model, messages=[ChatMessage(role=ChatRole.USER, content="hi")]
+        model=model,
+        messages=[ChatMessage(role=ChatRole.USER, content="hi")],
+        temperature=temperature,
     )
 
 
 def _service() -> ChatCompletionService:
-    return ChatCompletionService(router=ModelRouter(), executor=FallbackExecutor(wait=wait_none()))
+    return ChatCompletionService(
+        router=ModelRouter(),
+        executor=FallbackExecutor(wait=wait_none()),
+        cache=make_fake_cache_service(),
+    )
 
 
 def _patch_providers(monkeypatch: pytest.MonkeyPatch, providers: dict[str, FakeProvider]) -> None:
@@ -78,3 +84,23 @@ async def test_complete_raises_all_providers_exhausted(monkeypatch: pytest.Monke
 
     with pytest.raises(AllProvidersExhaustedError):
         await _service().complete(_request("gpt-4o-mini"), task_type="summarization")
+
+
+async def test_complete_serves_second_identical_request_from_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Only one outcome queued — a second provider call would raise.
+    openai_provider = FakeProvider(
+        "openai", [make_response(provider="openai", model="gpt-4o-mini")]
+    )
+    _patch_providers(monkeypatch, {"openai": openai_provider})
+    service = _service()
+    request = _request("gpt-4o-mini", temperature=0.0)
+
+    first = await service.complete(request, task_type="summarization")
+    second = await service.complete(request, task_type="summarization")
+
+    assert first.cached is False
+    assert second.cached is True
+    assert second.content == first.content
+    assert openai_provider.calls == 1

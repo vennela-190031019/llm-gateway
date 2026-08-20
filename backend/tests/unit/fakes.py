@@ -1,10 +1,23 @@
-"""Shared test doubles for the provider layer. Not a test module itself."""
+"""Shared test doubles for the provider and cache layers. Not a test module itself."""
 
 from __future__ import annotations
+
+import fakeredis.aioredis as fakeredis
 
 from app.providers.base import LLMProvider
 from app.providers.exceptions import ProviderError
 from app.schemas.chat import ChatCompletionRequest, ChatCompletionResponse, FinishReason
+from app.services.cache import CacheService
+
+
+def make_fake_cache_service(
+    *, ttl_seconds: int = 60, temperature_threshold: float = 0.0
+) -> CacheService:
+    """A CacheService backed by an isolated in-memory fake Redis instance."""
+    client = fakeredis.FakeRedis(decode_responses=True)
+    return CacheService(
+        client=client, ttl_seconds=ttl_seconds, temperature_threshold=temperature_threshold
+    )
 
 
 def make_response(*, provider: str, model: str, content: str = "ok") -> ChatCompletionResponse:
