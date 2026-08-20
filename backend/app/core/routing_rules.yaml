@@ -1,0 +1,29 @@
+# Model routing rules.
+#
+# Maps a task_type (supplied in the chat request metadata) to an ordered
+# list of candidate models. The router tries them in order, falling back
+# to the next on failure (see services/fallback.py).
+#
+# "tier" is informational metadata used for cost/latency dashboards.
+
+rules:
+  coding:
+    tier: high-capability
+    models: ["gpt-4o", "gpt-4o-mini"]
+
+  summarization:
+    tier: low-cost
+    models: ["gpt-4o-mini", "llama3.1"]
+
+  classification:
+    tier: low-cost
+    models: ["gpt-4o-mini", "llama3.1"]
+
+  default:
+    tier: balanced
+    models: ["gpt-4o-mini", "gpt-4o"]
+
+# Provider-level fallback order, used when a model's own provider is down.
+fallback_chain:
+  - openai
+  - ollama
