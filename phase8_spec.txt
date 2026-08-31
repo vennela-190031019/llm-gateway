@@ -1,0 +1,34 @@
+This is the LLM Gateway & Observability Platform project. Phases 1-7 are done and committed (scaffolding, database/auth, provider abstraction, routing/retry/fallback, Redis caching, cost tracking + real /chat/completions endpoint, prompt management). Read backend/app/models/, backend/app/schemas/chat.py, and backend/app/api/v1/evaluations.py before writing anything.
+
+Implement Phase 8: LLM evaluation framework.
+
+1. ORM models (app/models/evaluation.py):
+   - EvaluationDataset: id, name (unique), description, owner_id (FK->users), created_at.
+   - EvaluationCase: id, dataset_id (FK), input (the prompt/messages to send), expected_output (reference answer, nullable if not applicable to the metric), created_at.
+   - EvaluationRun: id, dataset_id (FK), model, provider, started_at, completed_at (nullable), status (pending/running/completed/failed).
+   - EvaluationResult: id, run_id (FK), case_id (FK), actual_output, latency_ms, tokens, cost, scores (JSON - a dict of metric_name -> score), created_at.
+   Add an Alembic migration.
+
+2. Evaluator interface (app/services/evaluators/base.py) - an abstract Evaluator with an async evaluate(input, expected_output, actual_output) -> float (0.0-1.0 score) method, designed so new evaluators can be added later without changing callers.
+
+3. Implement at least two evaluators:
+   - ExactMatchEvaluator (app/services/evaluators/exact_match.py) - simple string equality (case-insensitive, whitespace-normalized) between actual_output and expected_output. No LLM call needed.
+   - AnswerRelevanceEvaluator (app/services/evaluators/relevance.py) - uses an LLM call (via the existing provider abstraction from Phase 3) to score how relevant actual_output is to the input on a 0-1 scale, with a clear prompt template asking for a numeric score. Handle malformed LLM responses gracefully (fall back to a documented default or raise a clear error - your judgment, document which).
+
+4. An evaluator registry (app/services/evaluators/registry.py) mapping metric names ("exact_match", "answer_relevance") to evaluator instances, following the same pattern as the provider registry from Phase 3.
+
+5. EvaluationService (app/services/evaluation_service.py):
+   - create_dataset(name, description, owner) and add_case(dataset_id, input, expected_output)
+   - run_evaluation(dataset_id, model, provider, metrics: list[str]) - creates an EvaluationRun, iterates every case in the dataset, calls the LLM via ChatCompletionService (Phase 6) to get actual_output, runs each requested evaluator, records latency/tokens/cost/scores per case in EvaluationResult, and updates the run's status/completed_at when done. If a single case fails, record what you can and continue with the rest rather than aborting the whole run - document this choice.
+
+6. Real API endpoints (app/api/v1/evaluations.py), replacing the Phase 1 stub:
+   - POST /evaluations/datasets - create a dataset
+   - POST /evaluations/datasets/{id}/cases - add a case
+   - GET /evaluations/datasets - list datasets
+   - POST /evaluations/runs - start a run (dataset_id, model, provider, metrics)
+   - GET /evaluations/runs/{id} - get run status and results summary (aggregate scores per metric)
+   - GET /evaluations/runs/{id}/results - list individual per-case results
+
+7. Tests: cover ExactMatchEvaluator scoring (match and no-match cases), AnswerRelevanceEvaluator with a fake provider (no real LLM calls), evaluator registry lookup, EvaluationService.run_evaluation end-to-end with fake providers and a small dataset (verify results are persisted correctly, run status transitions correctly, partial failure handling), and API tests for each endpoint including auth requirements.
+
+After implementing, run uv pip install -e ".[dev]", ruff check ., mypy app, and pytest -q in backend - fix everything until clean, then summarize what you built, your partial-failure handling decision, your malformed-LLM-response handling decision for AnswerRelevanceEvaluator, and the final check output. Do not commit - leave it in the working tree for review.
