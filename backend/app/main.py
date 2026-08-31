@@ -18,6 +18,7 @@ from app.api.v1 import auth, chat, evaluations, health, models, prompts, request
 from app.api.v1 import metrics as metrics_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.core.middleware import HTTPMetricsMiddleware, RequestTracingMiddleware
 
 settings = get_settings()
 configure_logging(log_level=settings.log_level, json_logs=settings.is_production)
@@ -45,6 +46,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Middleware added later wraps outside what's added earlier, so tracing
+# (which every log line and the metrics middleware itself can benefit
+# from) ends up outermost, running before — and completing after —
+# HTTP-metrics timing.
+app.add_middleware(HTTPMetricsMiddleware)
+app.add_middleware(RequestTracingMiddleware)
 
 API_PREFIX = "/api/v1"
 app.include_router(health.router, prefix=API_PREFIX)

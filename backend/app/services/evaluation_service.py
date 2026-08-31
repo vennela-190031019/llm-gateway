@@ -2,6 +2,12 @@
 running every case in a dataset against a model/provider through the
 pluggable evaluator registry (app.services.evaluators).
 
+Each case's completion reports the same LLM metrics
+(llm_requests_total, llm_request_latency_seconds, llm_tokens_total,
+llm_cost_total, llm_errors_total) that app.api.v1.chat reports for
+/chat/completions — eval traffic is real LLM traffic and should show up
+in the same dashboards, not just be tracked in EvaluationResult rows.
+
 Endpoints translate the exceptions raised here into HTTP responses —
 this module has no knowledge of FastAPI.
 """
@@ -15,6 +21,13 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from app.core.logging import get_logger
+from app.core.metrics import (
+    llm_cost_total,
+    llm_errors_total,
+    llm_request_latency_seconds,
+    llm_requests_total,
+    llm_tokens_total,
+)
 from app.models.evaluation import (
     EvaluationCase,
     EvaluationDataset,
@@ -22,6 +35,7 @@ from app.models.evaluation import (
     EvaluationRun,
     EvaluationRunStatus,
 )
+from app.models.llm_request import LLMRequestStatus
 from app.repositories.evaluation_repository import EvaluationRepository
 from app.repositories.model_repository import ModelRepository
 from app.schemas.chat import ChatCompletionRequest, ChatMessage, ChatRole
@@ -29,6 +43,8 @@ from app.services.chat_service import ChatCompletionService
 from app.services.cost import CostService, UnknownModelPricingError
 from app.services.evaluators.base import Evaluator
 from app.services.evaluators.registry import get_evaluator
+
+_UNROUTED_LABEL = "none"
 
 logger = get_logger(__name__)
 
@@ -179,6 +195,19 @@ class EvaluationService:
                 case_id=str(case.id),
                 error=str(exc),
             )
+            # Mirrors app.api.v1.chat's AllProvidersExhaustedError handling:
+            # a case's provider couldn't be resolved (routing exhausted, or
+            # any other failure short-circuiting ChatCompletionService), so
+            # there's no real provider/model to label this attempt with.
+            llm_requests_total.labels(
+                model=model, provider=_UNROUTED_LABEL, status=LLMRequestStatus.ERROR
+            ).inc()
+            llm_request_latency_seconds.labels(model=model, provider=_UNROUTED_LABEL).observe(
+                latency_ms / 1000
+            )
+            llm_errors_total.labels(
+                model=model, provider=_UNROUTED_LABEL, error_type=type(exc).__name__
+            ).inc()
             await self._repository.add_result(
                 EvaluationResult(
                     run_id=run.id,
@@ -195,6 +224,19 @@ class EvaluationService:
         latency_ms = (time.monotonic() - started) * 1000
         tokens = response.input_tokens + response.output_tokens
 
+        llm_requests_total.labels(
+            model=response.model, provider=response.provider, status=LLMRequestStatus.SUCCESS
+        ).inc()
+        llm_request_latency_seconds.labels(
+            model=response.model, provider=response.provider
+        ).observe(latency_ms / 1000)
+        llm_tokens_total.labels(
+            model=response.model, provider=response.provider, type="input"
+        ).inc(response.input_tokens)
+        llm_tokens_total.labels(
+            model=response.model, provider=response.provider, type="output"
+        ).inc(response.output_tokens)
+
         cost: Decimal | None
         try:
             cost = await self._cost_service.estimate_cost(
@@ -205,6 +247,10 @@ class EvaluationService:
             )
         except UnknownModelPricingError:
             cost = None
+        if cost is not None:
+            llm_cost_total.labels(model=response.model, provider=response.provider).inc(
+                float(cost)
+            )
 
         scores: dict[str, float] = {}
         for metric_name, evaluator in evaluators:

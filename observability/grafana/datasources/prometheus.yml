@@ -1,0 +1,16 @@
+# Grafana datasource provisioning: auto-registers Prometheus on startup
+# so it doesn't need to be added manually through the UI.
+# https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    # "prometheus" resolves via Docker Compose's default network — see
+    # the `prometheus` service in docker-compose.yml.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

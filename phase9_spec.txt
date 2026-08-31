@@ -1,0 +1,20 @@
+This is the LLM Gateway & Observability Platform project. Phases 1-8 are done and committed (scaffolding, database/auth, provider abstraction, routing/retry/fallback, Redis caching, cost tracking + real /chat/completions endpoint, prompt management, evaluation framework). Read backend/app/core/metrics.py, backend/app/api/v1/chat.py, backend/app/core/logging.py, and observability/prometheus/prometheus.yml before writing anything.
+
+Implement Phase 9: Prometheus/Grafana observability.
+
+1. Audit every place metrics are (or should be) incremented across the codebase - chat.py (already done in Phase 6), evaluation_service.py, cache.py. Confirm all 7 metrics from app/core/metrics.py (llm_requests_total, llm_request_latency_seconds, llm_tokens_total, llm_cost_total, llm_errors_total, llm_cache_hits_total, llm_cache_misses_total) are actually wired up correctly with the right labels everywhere they're relevant. Fix any gaps you find and document what you fixed.
+
+2. Add a request-tracing middleware (app/core/middleware.py) that generates a request_id and trace_id (if not already present in headers) for every incoming HTTP request, binds them to structlog's contextvars for the duration of the request so every log line in that request automatically includes them, and adds them to the response headers (X-Request-ID). Wire this into app/main.py.
+
+3. Add HTTP-level metrics too (not just LLM-specific): http_requests_total (labeled by method, path, status_code) and http_request_duration_seconds (labeled by method, path) via a lightweight middleware, separate from the LLM-specific metrics.
+
+4. Grafana dashboard JSON files in observability/grafana/dashboards/ - create at least 3 dashboards as JSON provisioning files:
+   - request-overview.json: request volume over time, success rate, average latency, HTTP status code breakdown
+   - llm-usage.json: token usage by model, cost by model over time, cache hit rate, requests by provider
+   - errors.json: error rate over time, errors by provider, errors by type
+
+5. A Grafana datasource provisioning file (observability/grafana/datasources/prometheus.yml) so Prometheus is auto-configured as a data source on startup, not requiring manual setup in the UI. Update docker-compose.yml's grafana service to mount both the dashboards and datasources provisioning directories correctly (check the existing volume mount is even correct for Grafana's expected provisioning structure - it likely needs a dashboards/dashboards.yml provisioning config file too, not just the raw dashboard JSONs).
+
+6. Tests: unit tests for the request-tracing middleware (request_id is generated when absent, honored when provided via header, present in response headers, present in logs via a captured log context) and tests confirming metrics actually increment on real requests (you can inspect prometheus_client's REGISTRY or use generate_latest() and parse it in a test).
+
+After implementing, run uv pip install -e ".[dev]", ruff check ., mypy app, and pytest -q in backend - fix everything until clean, then summarize what you found/fixed in the metrics audit, what's in each dashboard, and the final check output. Do not commit - leave it in the working tree for review.

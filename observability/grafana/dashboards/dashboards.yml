@@ -1,0 +1,24 @@
+# Grafana dashboard provisioning: tells Grafana where to find dashboard
+# JSON files on disk so they load automatically on startup instead of
+# needing to be imported by hand through the UI.
+#
+# This file and the dashboard JSONs it points to live in the same
+# directory on purpose — docker-compose.yml mounts this whole folder to
+# /etc/grafana/provisioning/dashboards, and Grafana's dashboard
+# provisioner expects that folder to contain provider config like this
+# one (not the raw dashboard JSONs by themselves).
+# https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+
+apiVersion: 1
+
+providers:
+  - name: "LLM Gateway"
+    orgId: 1
+    folder: "LLM Gateway"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

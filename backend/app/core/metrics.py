@@ -48,3 +48,19 @@ llm_cache_misses_total = Counter(
     "llm_cache_misses_total",
     "Total number of cache misses",
 )
+
+# HTTP-level metrics — transport-layer traffic (every request handled by
+# the app), distinct from the LLM-specific metrics above (only requests
+# that actually call an LLM provider).
+
+http_requests_total = Counter(
+    "http_requests_total",
+    "Total number of HTTP requests processed",
+    ["method", "path", "status_code"],
+)
+
+http_request_duration_seconds = Histogram(
+    "http_request_duration_seconds",
+    "Latency of HTTP requests in seconds",
+    ["method", "path"],
+)

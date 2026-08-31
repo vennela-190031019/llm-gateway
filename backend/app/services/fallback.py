@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 from tenacity.wait import WaitBaseT
 
+from app.core.metrics import llm_errors_total
 from app.providers.exceptions import (
     ProviderError,
     ProviderRateLimitError,
@@ -77,5 +78,13 @@ class FallbackExecutor:
                 return await retrying(provider.complete, candidate_request)
             except ProviderError as exc:
                 failures.append(CandidateFailure(provider_name, model_name, str(exc)))
+                # Recorded per-candidate (not just on total exhaustion) so
+                # "errors by provider" stays meaningful even when a later
+                # candidate saves the request — otherwise a provider that
+                # fails on every request but always loses the race to
+                # fallback would never show up in llm_errors_total at all.
+                llm_errors_total.labels(
+                    model=model_name, provider=provider_name, error_type=type(exc).__name__
+                ).inc()
 
         raise AllProvidersExhaustedError(failures)
