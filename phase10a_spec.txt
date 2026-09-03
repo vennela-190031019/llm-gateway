@@ -1,0 +1,25 @@
+This is the LLM Gateway & Observability Platform project. The backend (Phases 1-9) is fully complete and committed - auth, database, provider abstraction, routing/fallback, caching, cost tracking, prompt management, evaluation framework, and Prometheus/Grafana observability. Read backend/app/api/v1/ (all files) and frontend/package.json before writing anything, so the frontend matches the real API shapes exactly.
+
+Implement Phase 10a: React dashboard - core pages (Dashboard, Requests, Models).
+
+1. Set up the Vite + React + TypeScript app properly in frontend/ - the package.json already lists dependencies (react-router-dom, axios, recharts, @tanstack/react-query), but verify/add vite.config.ts, tsconfig.json, index.html, src/main.tsx, and src/App.tsx with routing.
+
+2. API client (frontend/src/api/client.ts) - an axios instance pointed at the backend (use an environment variable for the base URL, default http://localhost:8000/api/v1), with a request interceptor that attaches the JWT bearer token from state/storage, and a response interceptor that handles 401s (redirect to login).
+
+3. Auth pages and flow (frontend/src/pages/Login.tsx, a simple auth context/hook in frontend/src/hooks/useAuth.ts) - a login form calling POST /auth/login, storing the token, and a route guard that redirects unauthenticated users to /login. Keep this simple - no registration UI needed yet, just login (you can register test users via the API directly).
+
+4. Dashboard page (frontend/src/pages/Dashboard.tsx) - the landing page after login. Show summary cards: Total Requests, Success Rate, Average Latency, Total Tokens, Estimated Cost, Cache Hit Rate. Since there's no dedicated summary endpoint yet, fetch recent data from GET /requests (or whatever the actual endpoint is - check app/api/v1/requests.py) and compute these client-side, OR flag clearly in your summary if you think a small backend summary endpoint is needed and what it should look like (don't build backend endpoints yourself in this phase - just flag it). Include at least one chart (recharts) showing requests over time.
+
+5. Requests page (frontend/src/pages/Requests.tsx) - a table of LLM requests (from the real /requests or /chat-related endpoint - check what's actually exposed) showing request ID, model, provider, latency, tokens, cost, status, cache hit, timestamp. Clicking a row navigates to a request detail view showing full info including any error.
+
+6. Models page (frontend/src/pages/Models.tsx) - list models from GET /models with their tier, pricing, and active status.
+
+7. Shared layout: a sidebar/nav component (frontend/src/components/Layout.tsx) with links to Dashboard, Models, Requests, Costs, Prompts, Evaluations, System Health (the last four are Phase 10b - just add the nav links now as placeholders/coming-soon pages so navigation structure exists, don't build their content yet).
+
+8. Use @tanstack/react-query for all data fetching (loading states, error states, caching) rather than raw useEffect + useState.
+
+9. Apply reasonable, clean styling - this doesn't need a full design system, but should look like a real internal engineering dashboard, not unstyled HTML. Use plain CSS or CSS modules (no need to add a new UI library unless you think it's clearly worth it - explain if you do).
+
+10. Tests: use vitest (already in devDependencies) for at least the API client (interceptor behavior) and one or two component tests (e.g. Dashboard renders summary cards, Requests table renders rows). Don't aim for exhaustive frontend test coverage in this phase - a handful of meaningful tests is enough.
+
+After implementing, run npm install, npm run build, and npm test (or npm run test if that's the script name) in frontend/ - fix everything until clean. Then summarize what you built, which pages are functional vs. placeholder, whether you think a backend summary endpoint is needed for the Dashboard (and what shape), and the final build/test output. Do not commit - leave it in the working tree for review.

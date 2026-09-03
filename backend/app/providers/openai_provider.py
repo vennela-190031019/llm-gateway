@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.providers.base import LLMProvider
 from app.providers.exceptions import (
     ProviderAuthenticationError,
+    ProviderConfigurationError,
     ProviderError,
     ProviderRateLimitError,
     ProviderResponseError,
@@ -35,9 +36,16 @@ class OpenAIProvider(LLMProvider):
 
     def __init__(self, client: AsyncOpenAI | None = None) -> None:
         settings = get_settings()
-        self._client = client or AsyncOpenAI(
-            api_key=settings.openai_api_key, base_url=settings.openai_base_url
-        )
+        try:
+            self._client = client or AsyncOpenAI(
+                api_key=settings.openai_api_key, base_url=settings.openai_base_url
+            )
+        except openai.OpenAIError as exc:
+            # AsyncOpenAI validates credentials at construction time, not
+            # per-request — this happens with no network call involved
+            # (e.g. OPENAI_API_KEY unset), so it must be translated here
+            # too, not just in complete()'s exception handling below.
+            raise ProviderConfigurationError(self.name, str(exc)) from exc
 
     async def complete(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
         started = time.monotonic()

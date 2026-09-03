@@ -5,6 +5,7 @@ from tenacity import wait_none
 
 from app.providers.exceptions import (
     ProviderAuthenticationError,
+    ProviderConfigurationError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
@@ -113,3 +114,41 @@ async def test_run_skips_retry_for_malformed_response_error(
 
     assert result.provider == "ollama"
     assert openai_provider.calls == 1
+
+
+async def test_run_falls_back_when_provider_construction_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression test: get_provider() itself can raise (e.g.
+    ProviderConfigurationError for a missing API key) — that must be
+    treated as a candidate failure eligible for fallback, not left to
+    propagate and blow up the whole request.
+    """
+    ollama_provider = FakeProvider("ollama", [make_response(provider="ollama", model="llama3.1")])
+
+    def _get_provider(name: str) -> FakeProvider:
+        if name == "openai":
+            raise ProviderConfigurationError("openai", "missing api key")
+        return ollama_provider
+
+    monkeypatch.setattr(fallback_module, "get_provider", _get_provider)
+
+    result = await _executor().run([("openai", "gpt-4o"), ("ollama", "llama3.1")], _request())
+
+    assert result.provider == "ollama"
+    assert ollama_provider.calls == 1
+
+
+async def test_run_raises_all_providers_exhausted_when_construction_fails_for_all(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _get_provider(name: str) -> FakeProvider:
+        raise ProviderConfigurationError(name, "missing api key")
+
+    monkeypatch.setattr(fallback_module, "get_provider", _get_provider)
+
+    with pytest.raises(AllProvidersExhaustedError) as exc_info:
+        await _executor().run([("openai", "gpt-4o"), ("ollama", "llama3.1")], _request())
+
+    failures = exc_info.value.failures
+    assert [f.provider for f in failures] == ["openai", "ollama"]

@@ -66,7 +66,6 @@ class FallbackExecutor:
         failures: list[CandidateFailure] = []
 
         for provider_name, model_name in candidates:
-            provider = get_provider(provider_name)
             candidate_request = request.model_copy(update={"model": model_name})
             retrying = AsyncRetrying(
                 reraise=True,
@@ -75,6 +74,13 @@ class FallbackExecutor:
                 retry=retry_if_exception_type(TRANSIENT_ERRORS),
             )
             try:
+                # get_provider() is inside this try deliberately: building a
+                # provider can fail too (e.g. ProviderConfigurationError for
+                # a missing API key), and that must be treated as a
+                # candidate failure — eligible for fallback to the next
+                # candidate — the same as a failure from .complete() itself,
+                # not left to propagate as an unhandled 500.
+                provider = get_provider(provider_name)
                 return await retrying(provider.complete, candidate_request)
             except ProviderError as exc:
                 failures.append(CandidateFailure(provider_name, model_name, str(exc)))

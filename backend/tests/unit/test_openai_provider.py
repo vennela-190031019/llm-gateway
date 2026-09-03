@@ -14,8 +14,10 @@ import openai
 import pytest
 from openai import AsyncOpenAI
 
+from app.core.config import get_settings
 from app.providers.exceptions import (
     ProviderAuthenticationError,
+    ProviderConfigurationError,
     ProviderError,
     ProviderRateLimitError,
     ProviderResponseError,
@@ -54,6 +56,26 @@ def _dummy_request_exc() -> httpx2.Request:
 
 def _dummy_response_exc(status_code: int) -> httpx2.Response:
     return httpx2.Response(status_code, request=_dummy_request_exc(), json={})
+
+
+async def test_construction_raises_provider_configuration_error_without_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AsyncOpenAI validates credentials at construction time, with no
+    network call involved — a regression test for a real bug where this
+    raised a raw openai.OpenAIError straight out of __init__ instead of
+    our typed ProviderError hierarchy, which meant it wasn't caught by
+    FallbackExecutor and surfaced as an unhandled 500 instead of a clean
+    502 (or falling back to another provider).
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    get_settings.cache_clear()
+
+    try:
+        with pytest.raises(ProviderConfigurationError):
+            OpenAIProvider()
+    finally:
+        get_settings.cache_clear()
 
 
 async def test_complete_returns_normalized_response() -> None:

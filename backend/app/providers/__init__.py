@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.providers.base import LLMProvider
 from app.providers.exceptions import (
     ProviderAuthenticationError,
+    ProviderConfigurationError,
     ProviderError,
     ProviderRateLimitError,
     ProviderResponseError,
@@ -18,6 +19,7 @@ __all__ = [
     "OllamaProvider",
     "OpenAIProvider",
     "ProviderAuthenticationError",
+    "ProviderConfigurationError",
     "ProviderError",
     "ProviderRateLimitError",
     "ProviderResponseError",

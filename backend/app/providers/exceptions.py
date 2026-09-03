@@ -33,5 +33,12 @@ class ProviderAuthenticationError(ProviderError):
     """The provider rejected our credentials."""
 
 
+class ProviderConfigurationError(ProviderError):
+    """The provider couldn't even be constructed (e.g. missing API key) —
+    a local misconfiguration, not something the provider itself rejected.
+    Never worth retrying.
+    """
+
+
 class ProviderResponseError(ProviderError):
     """The provider responded, but with a malformed or unexpected payload."""

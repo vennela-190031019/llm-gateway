@@ -12,7 +12,7 @@ from app.main import app
 from app.models.llm_model import LLMModel
 from app.models.llm_request import LLMRequestStatus
 from app.models.provider import Provider
-from app.providers.exceptions import ProviderTimeoutError
+from app.providers.exceptions import ProviderConfigurationError, ProviderTimeoutError
 from app.repositories.llm_request_repository import LLMRequestRepository
 from app.services import fallback as fallback_module
 from app.services.chat_service import ChatCompletionService
@@ -178,6 +178,44 @@ async def test_completions_returns_502_and_logs_failure_when_providers_exhausted
     assert record.provider is None
     assert record.input_tokens == 0
     assert record.estimated_cost is None
+
+
+async def test_completions_returns_502_when_provider_construction_fails(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression test for a real bug: OPENAI_API_KEY unset caused
+    AsyncOpenAI to raise at construction time, outside the code path that
+    catches provider errors — so a request that should have failed over
+    to Ollama (or, if every candidate is misconfigured, returned a clean
+    502) instead surfaced as an unhandled 500.
+    """
+    def _get_provider(name: str) -> FakeProvider:
+        raise ProviderConfigurationError(name, "missing api key")
+
+    monkeypatch.setattr(fallback_module, "get_provider", _get_provider)
+    service = ChatCompletionService(
+        router=ModelRouter(),
+        executor=FallbackExecutor(wait=wait_none()),
+        cache=make_fake_cache_service(),
+    )
+    app.dependency_overrides[get_chat_service] = lambda: service
+    token = await _register_and_login(client, "misconfigured@example.com")
+    user_id = await _current_user_id(client, token)
+
+    try:
+        response = await client.post(
+            "/api/v1/chat/completions",
+            json=_payload(task_type="summarization"),
+            headers=_auth_headers(token),
+        )
+    finally:
+        app.dependency_overrides.pop(get_chat_service, None)
+
+    assert response.status_code == 502
+
+    records = await LLMRequestRepository(db_session).list_for_user(user_id)
+    assert len(records) == 1
+    assert records[0].status == LLMRequestStatus.ERROR
 
 
 async def test_completions_persists_cost_and_token_usage(
