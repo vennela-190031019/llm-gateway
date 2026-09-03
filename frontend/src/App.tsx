@@ -3,12 +3,15 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider } from "./hooks/useAuth";
-import { ComingSoon } from "./pages/ComingSoon";
+import { Costs } from "./pages/Costs";
 import { Dashboard } from "./pages/Dashboard";
+import { Evaluations } from "./pages/Evaluations";
 import { Login } from "./pages/Login";
 import { Models } from "./pages/Models";
+import { Prompts } from "./pages/Prompts";
 import { RequestDetail } from "./pages/RequestDetail";
 import { Requests } from "./pages/Requests";
+import { SystemHealth } from "./pages/SystemHealth";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,10 +36,10 @@ function AppRoutes() {
                 <Route path="/models" element={<Models />} />
                 <Route path="/requests" element={<Requests />} />
                 <Route path="/requests/:requestId" element={<RequestDetail />} />
-                <Route path="/costs" element={<ComingSoon title="Costs" />} />
-                <Route path="/prompts" element={<ComingSoon title="Prompts" />} />
-                <Route path="/evaluations" element={<ComingSoon title="Evaluations" />} />
-                <Route path="/system-health" element={<ComingSoon title="System Health" />} />
+                <Route path="/costs" element={<Costs />} />
+                <Route path="/prompts" element={<Prompts />} />
+                <Route path="/evaluations" element={<Evaluations />} />
+                <Route path="/system-health" element={<SystemHealth />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>

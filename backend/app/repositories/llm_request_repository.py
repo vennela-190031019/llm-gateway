@@ -29,6 +29,14 @@ class RequestsAggregate:
     average_latency_ms: float | None
 
 
+@dataclass(frozen=True)
+class ModelCostAggregate:
+    model: str
+    total_requests: int
+    total_tokens: int
+    total_cost: Decimal
+
+
 class LLMRequestRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -88,6 +96,36 @@ class LLMRequestRepository:
                 float(average_latency_ms) if average_latency_ms is not None else None
             ),
         )
+
+    async def get_cost_by_model_for_user(
+        self, user_id: uuid.UUID
+    ) -> Sequence[ModelCostAggregate]:
+        """Per-model totals over *every* request the user has — for an
+        accurate cost breakdown, not just a capped/paginated page of
+        recent requests (see app.api.v1.requests.list_requests).
+        """
+        stmt = (
+            select(
+                LLMRequest.model,
+                func.count(LLMRequest.request_id),
+                func.sum(LLMRequest.total_tokens),
+                func.sum(LLMRequest.estimated_cost),
+            )
+            .where(LLMRequest.user_id == user_id)
+            .group_by(LLMRequest.model)
+            .order_by(func.sum(LLMRequest.estimated_cost).desc())
+        )
+
+        rows = (await self.session.execute(stmt)).all()
+        return [
+            ModelCostAggregate(
+                model=model,
+                total_requests=total_requests or 0,
+                total_tokens=total_tokens or 0,
+                total_cost=_as_decimal(total_cost),
+            )
+            for model, total_requests, total_tokens, total_cost in rows
+        ]
 
 
 def _as_decimal(value: object) -> Decimal:

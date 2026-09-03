@@ -7,9 +7,9 @@ in this API (prompts, evaluations) is likewise scoped to its owner. The
 detail endpoint 404s (not 403s) for another user's request id, so it
 doesn't leak which ids exist.
 
-Route order matters here: /summary must be declared before /{request_id}
-— otherwise FastAPI would try to parse "summary" as a UUID path param
-and 422 before ever reaching the summary handler.
+Route order matters here: /summary and /cost-by-model must be declared
+before /{request_id} — otherwise FastAPI would try to parse them as a
+UUID path param and 422 before ever reaching the intended handler.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.core.dependencies import ActiveUser, DbSession
 from app.models.llm_request import LLMRequest
 from app.repositories.llm_request_repository import LLMRequestRepository
-from app.schemas.llm_request import LLMRequestRead, RequestsSummaryRead
+from app.schemas.llm_request import LLMRequestRead, ModelCostRead, RequestsSummaryRead
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 
@@ -60,6 +60,20 @@ async def get_requests_summary(
         total_cost=aggregate.total_cost,
         cache_hit_rate=(aggregate.cache_hit_count / aggregate.total_requests) * 100,
     )
+
+
+@router.get("/cost-by-model", response_model=list[ModelCostRead])
+async def get_cost_by_model(session: DbSession, current_user: ActiveUser) -> list[ModelCostRead]:
+    aggregates = await LLMRequestRepository(session).get_cost_by_model_for_user(current_user.id)
+    return [
+        ModelCostRead(
+            model=aggregate.model,
+            total_requests=aggregate.total_requests,
+            total_tokens=aggregate.total_tokens,
+            total_cost=aggregate.total_cost,
+        )
+        for aggregate in aggregates
+    ]
 
 
 @router.get("/{request_id}", response_model=LLMRequestRead)

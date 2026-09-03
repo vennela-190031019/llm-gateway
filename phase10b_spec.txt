@@ -1,0 +1,19 @@
+This is the LLM Gateway & Observability Platform project. The backend (Phases 1-9) and the frontend core (Phase 10a: Dashboard, Requests, Models pages, auth flow, layout with nav) are complete and committed. Read backend/app/api/v1/prompts.py, evaluations.py, requests.py, and frontend/src/api/, frontend/src/pages/, frontend/src/components/Layout.tsx before writing anything, to match existing patterns exactly.
+
+Implement Phase 10b: React dashboard - remaining pages (Costs, Prompts, Evaluations, System Health).
+
+1. Costs page (frontend/src/pages/Costs.tsx) - cost breakdown over time and by model. Use the existing GET /requests/summary and/or GET /requests data (check what fields are available - you may need to aggregate client-side by model since there's likely no dedicated cost-by-model backend endpoint yet). Include a chart (recharts) showing cost by model, and a chart showing cost over time. If you think a backend endpoint would meaningfully improve this (e.g. cost aggregated by model), you may add it following the existing repository/service/API pattern - your judgment, but keep it small and note it clearly in your summary.
+
+2. Prompts page (frontend/src/pages/Prompts.tsx) - list prompt templates (GET /prompts), with a way to view a template's versions (GET /prompts/{name}), create a new template (POST /prompts) and a new version (POST /prompts/{name}/versions) via simple forms/modals, and a way to try the render endpoint (GET /prompts/{name}/render) with variable inputs to preview the rendered output. Also support activating a version (PATCH .../activate).
+
+3. Evaluations page (frontend/src/pages/Evaluations.tsx) - list evaluation datasets (GET /evaluations/datasets), a way to create a dataset and add cases, a way to start a run (POST /evaluations/runs) picking model/provider/metrics, and a way to view a run's results (GET /evaluations/runs/{id} for summary, GET /evaluations/runs/{id}/results for per-case detail) including aggregate scores per metric.
+
+4. System Health page (frontend/src/pages/SystemHealth.tsx) - show live status: call GET /healthz and display it, and fetch/parse the Prometheus /metrics endpoint (note: this is likely on a different port/base URL than /api/v1 - check main.py for where it's mounted) to show a few key numbers (e.g. total requests, error count, cache hit/miss counts) parsed from the raw Prometheus text format. If parsing raw Prometheus text client-side is awkward, it's fine to keep this page simpler (e.g. just health status plus links to Grafana/Prometheus UIs at their docker-compose ports) - your judgment, explain your choice.
+
+5. Replace the ComingSoon placeholders for these four routes in the router/nav with the real pages.
+
+6. Keep using @tanstack/react-query for data fetching, and match the existing visual style (StatCard, Layout, etc.) so the app feels cohesive, not like four different apps bolted together.
+
+7. Tests: component tests for each new page (at least: renders without crashing, shows real data given a mocked API response, and one interaction path per page - e.g. Prompts: creating a template calls the API; Evaluations: starting a run calls the API). Follow the existing test patterns from Dashboard.test.tsx and Requests.test.tsx.
+
+After implementing, run npm run build and npm test in frontend/ - fix everything until clean. If you added any backend endpoints, also run ruff check ., mypy app, and pytest -q in backend/ and fix those too. Then summarize what you built, any backend additions and why, which parts of System Health you implemented vs simplified, and the final build/test output for both sides. Do not commit - leave it in the working tree for review.

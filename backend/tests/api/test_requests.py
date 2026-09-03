@@ -232,3 +232,77 @@ async def test_summary_computes_correct_aggregates(
     assert body["total_tokens"] == 30
     assert float(body["total_cost"]) == pytest.approx(0.03)
     assert body["cache_hit_rate"] == pytest.approx(100 / 3)
+
+
+async def test_cost_by_model_requires_authentication(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/requests/cost-by-model")
+    assert response.status_code == 401
+
+
+async def test_cost_by_model_returns_empty_list_with_no_requests(client: AsyncClient) -> None:
+    token = await _register_and_login(client, "empty-cost@example.com")
+
+    response = await client.get("/api/v1/requests/cost-by-model", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_cost_by_model_groups_and_sums_per_model(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    token = await _register_and_login(client, "cost-grouper@example.com")
+    user_id = await _current_user_id(client, token)
+
+    await _create_request(
+        db_session,
+        user_id=user_id,
+        model="gpt-4o-mini",
+        input_tokens=10,
+        output_tokens=10,
+        estimated_cost="0.01",
+    )
+    await _create_request(
+        db_session,
+        user_id=user_id,
+        model="gpt-4o-mini",
+        input_tokens=5,
+        output_tokens=5,
+        estimated_cost="0.02",
+    )
+    await _create_request(
+        db_session,
+        user_id=user_id,
+        model="gpt-4o",
+        input_tokens=100,
+        output_tokens=50,
+        estimated_cost="0.50",
+    )
+
+    response = await client.get("/api/v1/requests/cost-by-model", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = {row["model"]: row for row in response.json()}
+    assert body["gpt-4o-mini"]["total_requests"] == 2
+    assert body["gpt-4o-mini"]["total_tokens"] == 30
+    assert float(body["gpt-4o-mini"]["total_cost"]) == pytest.approx(0.03)
+    assert body["gpt-4o"]["total_requests"] == 1
+    assert float(body["gpt-4o"]["total_cost"]) == pytest.approx(0.50)
+
+
+async def test_cost_by_model_only_includes_current_users_requests(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    token_a = await _register_and_login(client, "cost-owner@example.com")
+    user_a = await _current_user_id(client, token_a)
+    token_b = await _register_and_login(client, "cost-other@example.com")
+    user_b = await _current_user_id(client, token_b)
+
+    await _create_request(db_session, user_id=user_a, model="gpt-4o-mini")
+    await _create_request(db_session, user_id=user_b, model="gpt-4o")
+
+    response = await client.get("/api/v1/requests/cost-by-model", headers=_auth_headers(token_a))
+
+    assert response.status_code == 200
+    models = [row["model"] for row in response.json()]
+    assert models == ["gpt-4o-mini"]

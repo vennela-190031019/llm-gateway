@@ -42,3 +42,14 @@ class RequestsSummaryRead(BaseModel):
     total_tokens: int
     total_cost: Decimal
     cache_hit_rate: float | None
+
+
+class ModelCostRead(BaseModel):
+    """One row of LLMRequestRepository.get_cost_by_model_for_user — also
+    aggregated across *all* of the user's requests, not a capped page.
+    """
+
+    model: str
+    total_requests: int
+    total_tokens: int
+    total_cost: Decimal

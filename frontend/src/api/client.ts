@@ -4,6 +4,14 @@ import { clearToken, getToken } from "./token";
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
+/**
+ * The backend's root, without the /api/v1 prefix — /metrics (Prometheus
+ * exposition) and other infra endpoints live there, not under /api/v1.
+ * See backend/app/main.py: everything else is mounted under API_PREFIX,
+ * but the Prometheus scrape endpoint deliberately isn't.
+ */
+export const API_ROOT_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+
 // The one endpoint allowed to 401 without triggering a forced redirect —
 // that's just a bad-credentials login attempt, not an expired session.
 const LOGIN_PATH = "/auth/login";

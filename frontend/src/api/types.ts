@@ -56,3 +56,90 @@ export interface RequestsSummaryRead {
   total_cost: string;
   cache_hit_rate: number | null;
 }
+
+/** One row per model, aggregated over *all* of the current user's requests. */
+export interface ModelCostRead {
+  model: string;
+  total_requests: number;
+  total_tokens: number;
+  total_cost: string;
+}
+
+// --- Prompts ---
+
+export interface PromptVersionRead {
+  id: string;
+  version: number;
+  template_text: string;
+  variables: string[];
+  model: string;
+  temperature: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PromptTemplateRead {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string;
+  created_at: string;
+}
+
+export interface PromptTemplateDetailRead extends PromptTemplateRead {
+  versions: PromptVersionRead[];
+}
+
+export interface PromptRenderResponse {
+  content: string;
+  model: string;
+  temperature: number;
+  version: number;
+}
+
+// --- Evaluations ---
+
+export interface EvaluationDatasetRead {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string;
+  created_at: string;
+}
+
+export interface EvaluationCaseRead {
+  id: string;
+  dataset_id: string;
+  input: string;
+  expected_output: string | null;
+  created_at: string;
+}
+
+export interface EvaluationDatasetDetailRead extends EvaluationDatasetRead {
+  cases: EvaluationCaseRead[];
+}
+
+export type EvaluationRunStatus = "pending" | "running" | "completed" | "failed";
+
+export interface EvaluationRunSummary {
+  id: string;
+  dataset_id: string;
+  model: string;
+  provider: string;
+  status: EvaluationRunStatus;
+  started_at: string;
+  completed_at: string | null;
+  case_count: number;
+  average_scores: Record<string, number>;
+}
+
+export interface EvaluationResultRead {
+  id: string;
+  case_id: string;
+  actual_output: string;
+  latency_ms: number;
+  tokens: number;
+  cost: string | null;
+  scores: Record<string, number>;
+  created_at: string;
+}

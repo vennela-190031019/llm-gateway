@@ -24,6 +24,7 @@ from app.schemas.evaluation import (
     EvaluationCaseCreate,
     EvaluationCaseRead,
     EvaluationDatasetCreate,
+    EvaluationDatasetDetailRead,
     EvaluationDatasetRead,
     EvaluationResultRead,
     EvaluationRunCreate,
@@ -84,6 +85,19 @@ async def list_datasets(
     session: DbSession, _current_user: ActiveUser
 ) -> list[EvaluationDataset]:
     return list(await EvaluationRepository(session).list_datasets())
+
+
+@router.get("/datasets/{dataset_id}", response_model=EvaluationDatasetDetailRead)
+async def get_dataset(
+    dataset_id: uuid.UUID, session: DbSession, _current_user: ActiveUser
+) -> EvaluationDataset:
+    dataset = await EvaluationRepository(session).get_dataset_by_id(dataset_id)
+    if dataset is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"no evaluation dataset with id {dataset_id}",
+        )
+    return dataset
 
 
 @router.post("/runs", response_model=EvaluationRunSummary, status_code=status.HTTP_201_CREATED)

@@ -5,17 +5,16 @@ import { useAuth } from "../hooks/useAuth";
 interface NavItem {
   to: string;
   label: string;
-  comingSoon?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard" },
   { to: "/models", label: "Models" },
   { to: "/requests", label: "Requests" },
-  { to: "/costs", label: "Costs", comingSoon: true },
-  { to: "/prompts", label: "Prompts", comingSoon: true },
-  { to: "/evaluations", label: "Evaluations", comingSoon: true },
-  { to: "/system-health", label: "System Health", comingSoon: true },
+  { to: "/costs", label: "Costs" },
+  { to: "/prompts", label: "Prompts" },
+  { to: "/evaluations", label: "Evaluations" },
+  { to: "/system-health", label: "System Health" },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -45,7 +44,6 @@ export function Layout({ children }: { children: ReactNode }) {
               }
             >
               <span>{item.label}</span>
-              {item.comingSoon && <span className="badge">soon</span>}
             </NavLink>
           ))}
         </nav>

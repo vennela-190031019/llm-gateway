@@ -41,6 +41,10 @@ class EvaluationCaseRead(BaseModel):
     created_at: datetime
 
 
+class EvaluationDatasetDetailRead(EvaluationDatasetRead):
+    cases: list[EvaluationCaseRead] = Field(default_factory=list)
+
+
 class EvaluationRunCreate(BaseModel):
     dataset_id: uuid.UUID
     model: str

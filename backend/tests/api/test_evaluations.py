@@ -128,6 +128,42 @@ async def test_list_datasets(client: AsyncClient) -> None:
     assert "listed-one" in names
 
 
+async def test_get_dataset_requires_authentication(client: AsyncClient) -> None:
+    response = await client.get(
+        "/api/v1/evaluations/datasets/00000000-0000-0000-0000-000000000000"
+    )
+    assert response.status_code == 401
+
+
+async def test_get_dataset_returns_404_for_unknown_id(client: AsyncClient) -> None:
+    token = await _register_and_login(client, "getter-404@example.com")
+
+    response = await client.get(
+        "/api/v1/evaluations/datasets/00000000-0000-0000-0000-000000000000",
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 404
+
+
+async def test_get_dataset_returns_detail_with_cases(client: AsyncClient) -> None:
+    token = await _register_and_login(client, "detail-getter@example.com")
+    dataset_id = await _create_dataset(client, token, "with-cases")
+    await _add_case(client, token, dataset_id, input="2+2?", expected_output="4")
+    await _add_case(client, token, dataset_id, input="capital of France?", expected_output="Paris")
+
+    response = await client.get(
+        f"/api/v1/evaluations/datasets/{dataset_id}", headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == dataset_id
+    assert body["name"] == "with-cases"
+    assert len(body["cases"]) == 2
+    assert {case["input"] for case in body["cases"]} == {"2+2?", "capital of France?"}
+
+
 async def test_start_run_requires_authentication(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/evaluations/runs",
