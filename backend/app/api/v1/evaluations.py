@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.core.dependencies import ActiveUser, DbSession
+from app.core.rate_limit import DEFAULT_RATE_LIMIT, limiter
 from app.models.evaluation import EvaluationCase, EvaluationDataset, EvaluationRun
 from app.repositories.evaluation_repository import EvaluationRepository
 from app.schemas.evaluation import (
@@ -44,8 +45,12 @@ router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 @router.post(
     "/datasets", response_model=EvaluationDatasetRead, status_code=status.HTTP_201_CREATED
 )
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def create_dataset(
-    payload: EvaluationDatasetCreate, session: DbSession, current_user: ActiveUser
+    request: Request,
+    payload: EvaluationDatasetCreate,
+    session: DbSession,
+    current_user: ActiveUser,
 ) -> EvaluationDataset:
     service = EvaluationService(EvaluationRepository(session))
     try:
@@ -63,7 +68,9 @@ async def create_dataset(
     response_model=EvaluationCaseRead,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def add_case(
+    request: Request,
     dataset_id: uuid.UUID,
     payload: EvaluationCaseCreate,
     session: DbSession,
@@ -81,15 +88,17 @@ async def add_case(
 
 
 @router.get("/datasets", response_model=list[EvaluationDatasetRead])
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def list_datasets(
-    session: DbSession, _current_user: ActiveUser
+    request: Request, session: DbSession, _current_user: ActiveUser
 ) -> list[EvaluationDataset]:
     return list(await EvaluationRepository(session).list_datasets())
 
 
 @router.get("/datasets/{dataset_id}", response_model=EvaluationDatasetDetailRead)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def get_dataset(
-    dataset_id: uuid.UUID, session: DbSession, _current_user: ActiveUser
+    request: Request, dataset_id: uuid.UUID, session: DbSession, _current_user: ActiveUser
 ) -> EvaluationDataset:
     dataset = await EvaluationRepository(session).get_dataset_by_id(dataset_id)
     if dataset is None:
@@ -101,8 +110,12 @@ async def get_dataset(
 
 
 @router.post("/runs", response_model=EvaluationRunSummary, status_code=status.HTTP_201_CREATED)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def start_run(
-    payload: EvaluationRunCreate, session: DbSession, _current_user: ActiveUser
+    request: Request,
+    payload: EvaluationRunCreate,
+    session: DbSession,
+    _current_user: ActiveUser,
 ) -> EvaluationRunSummary:
     service = EvaluationService(EvaluationRepository(session))
     try:
@@ -121,8 +134,9 @@ async def start_run(
 
 
 @router.get("/runs/{run_id}", response_model=EvaluationRunSummary)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def get_run(
-    run_id: uuid.UUID, session: DbSession, _current_user: ActiveUser
+    request: Request, run_id: uuid.UUID, session: DbSession, _current_user: ActiveUser
 ) -> EvaluationRunSummary:
     run = await EvaluationRepository(session).get_run_by_id(run_id)
     if run is None:
@@ -133,8 +147,9 @@ async def get_run(
 
 
 @router.get("/runs/{run_id}/results", response_model=list[EvaluationResultRead])
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def list_run_results(
-    run_id: uuid.UUID, session: DbSession, _current_user: ActiveUser
+    request: Request, run_id: uuid.UUID, session: DbSession, _current_user: ActiveUser
 ) -> list[EvaluationResultRead]:
     run = await EvaluationRepository(session).get_run_by_id(run_id)
     if run is None:

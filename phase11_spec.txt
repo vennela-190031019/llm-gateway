@@ -1,0 +1,23 @@
+This is the LLM Gateway & Observability Platform project. The backend (Phases 1-9) and full React frontend (Phase 10a/10b) are complete and committed. Read backend/app/main.py, backend/app/core/config.py, backend/app/core/dependencies.py, and backend/app/api/v1/ (all files) before writing anything.
+
+Implement Phase 11: Testing + security hardening.
+
+1. Rate limiting - add request rate limiting using slowapi (already a dependency from Phase 1). Apply a sensible default limit (configurable via settings, e.g. RATE_LIMIT_PER_MINUTE already exists in config.py) to all API endpoints, with a stricter limit specifically on POST /auth/login and POST /auth/register to reduce brute-force/spam risk. Return a proper 429 with a clear error body when exceeded. Make sure rate limiting doesn't break existing tests (may need a way to disable/relax it in the test environment - your judgment on the cleanest approach).
+
+2. Input validation review - audit all Pydantic request schemas (app/schemas/) for missing constraints: max lengths on free-text fields (template_text, description, messages content, etc.) to prevent abuse, sensible bounds on numeric fields (temperature 0-2, max_tokens reasonable upper bound, etc.). Fix gaps you find.
+
+3. Request size limits - ensure there's a reasonable max request body size enforced (check if FastAPI/Starlette needs explicit configuration for this, or if it's handled elsewhere) so someone can't send a gigabyte JSON payload.
+
+4. CORS review - check the current CORS configuration in main.py is reasonably locked down (not a wildcard in a way that would be unsafe) and uses settings.cors_origins properly.
+
+5. Secrets/logging audit - grep the codebase for any place a secret, password, token, or API key could end up in a log line, error message, or HTTP response, and fix any you find. Confirm the existing structlog redaction (from Phase 1/9) actually covers the right field names used throughout the codebase now that more modules exist.
+
+6. Dependency security check - run `pip list` or equivalent and note if there's an easy way to check for known-vulnerable dependency versions (e.g. pip-audit) - add it as a dev dependency and a CI step if reasonable, don't spend excessive time here, just a basic pass.
+
+7. SQL injection review - confirm all repository methods use SQLAlchemy's parameterized query patterns (they should already, given the ORM usage throughout) - do a quick audit pass and confirm/fix.
+
+8. Error handling review - make sure unhandled exceptions don't leak stack traces or internal details to API responses in a way that could aid an attacker (check FastAPI's default exception handling behavior, add a global exception handler if needed that logs full details server-side but returns a generic message to the client).
+
+9. Tests: cover rate limiting (exceeding the limit returns 429), input validation edge cases (oversized inputs rejected with 422), and the global exception handler (an unexpected error returns a generic message, not a stack trace).
+
+After implementing, run uv pip install -e ".[dev]", ruff check ., mypy app, and pytest -q in backend - fix everything until clean, then summarize every gap you found and fixed, anything you audited and found already correct, and the final check output. Do not commit - leave it in the working tree for review.

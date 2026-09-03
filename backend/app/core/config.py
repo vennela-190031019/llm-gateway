@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_per_minute: int = 60
 
+    # Request size limits
+    max_request_body_bytes: int = 10 * 1024 * 1024  # 10 MiB
+
     # Routing
     routing_rules_path: str = "app/core/routing_rules.yaml"
 

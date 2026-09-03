@@ -11,7 +11,10 @@ from app.models.user import UserRole
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    # 320 matches app.models.user.User.email's column width (the RFC
+    # 5321 maximum) — without this, an oversized email would pass schema
+    # validation and only fail once it hits the DB.
+    email: EmailStr = Field(max_length=320)
     password: str = Field(min_length=8, max_length=72)
 
 

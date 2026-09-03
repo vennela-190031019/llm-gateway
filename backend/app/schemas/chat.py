@@ -20,7 +20,10 @@ class ChatRole(StrEnum):
 
 class ChatMessage(BaseModel):
     role: ChatRole
-    content: str
+    # 50k chars is generous for a single message while still bounding
+    # per-message abuse; the overall body-size limit (see
+    # app.core.middleware) is the backstop for the request as a whole.
+    content: str = Field(max_length=50_000)
 
 
 class FinishReason(StrEnum):
@@ -37,14 +40,17 @@ class ChatRequestMetadata(BaseModel):
     """
 
     cacheable: bool = True
-    task_type: str | None = None
+    task_type: str | None = Field(default=None, max_length=100)
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str
-    messages: list[ChatMessage] = Field(min_length=1)
-    temperature: float = 1.0
-    max_tokens: int | None = None
+    model: str = Field(max_length=200)
+    messages: list[ChatMessage] = Field(min_length=1, max_length=100)
+    temperature: float = Field(default=1.0, ge=0, le=2)
+    # No provider actually supports 32k+ output tokens today, but this is
+    # a schema-level sanity ceiling, not a model-specific one — providers
+    # still reject values their own model can't honor.
+    max_tokens: int | None = Field(default=None, gt=0, le=32_000)
     metadata: ChatRequestMetadata = Field(default_factory=ChatRequestMetadata)
 
 

@@ -17,9 +17,10 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.core.dependencies import ActiveUser, DbSession
+from app.core.rate_limit import DEFAULT_RATE_LIMIT, limiter
 from app.models.llm_request import LLMRequest
 from app.repositories.llm_request_repository import LLMRequestRepository
 from app.schemas.llm_request import LLMRequestRead, ModelCostRead, RequestsSummaryRead
@@ -28,7 +29,9 @@ router = APIRouter(prefix="/requests", tags=["requests"])
 
 
 @router.get("", response_model=list[LLMRequestRead])
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def list_requests(
+    request: Request,
     session: DbSession,
     current_user: ActiveUser,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
@@ -37,8 +40,9 @@ async def list_requests(
 
 
 @router.get("/summary", response_model=RequestsSummaryRead)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def get_requests_summary(
-    session: DbSession, current_user: ActiveUser
+    request: Request, session: DbSession, current_user: ActiveUser
 ) -> RequestsSummaryRead:
     aggregate = await LLMRequestRepository(session).get_aggregate_for_user(current_user.id)
 
@@ -63,7 +67,10 @@ async def get_requests_summary(
 
 
 @router.get("/cost-by-model", response_model=list[ModelCostRead])
-async def get_cost_by_model(session: DbSession, current_user: ActiveUser) -> list[ModelCostRead]:
+@limiter.limit(DEFAULT_RATE_LIMIT)
+async def get_cost_by_model(
+    request: Request, session: DbSession, current_user: ActiveUser
+) -> list[ModelCostRead]:
     aggregates = await LLMRequestRepository(session).get_cost_by_model_for_user(current_user.id)
     return [
         ModelCostRead(
@@ -77,14 +84,15 @@ async def get_cost_by_model(session: DbSession, current_user: ActiveUser) -> lis
 
 
 @router.get("/{request_id}", response_model=LLMRequestRead)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def get_request(
-    request_id: uuid.UUID, session: DbSession, current_user: ActiveUser
+    request: Request, request_id: uuid.UUID, session: DbSession, current_user: ActiveUser
 ) -> LLMRequest:
-    request = await LLMRequestRepository(session).get_by_request_id_for_user(
+    llm_request = await LLMRequestRepository(session).get_by_request_id_for_user(
         request_id, current_user.id
     )
-    if request is None:
+    if llm_request is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"no request with id {request_id}"
         )
-    return request
+    return llm_request

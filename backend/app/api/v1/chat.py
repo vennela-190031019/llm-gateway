@@ -12,7 +12,7 @@ import uuid
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import ActiveUser, DbSession
@@ -24,6 +24,7 @@ from app.core.metrics import (
     llm_requests_total,
     llm_tokens_total,
 )
+from app.core.rate_limit import DEFAULT_RATE_LIMIT, limiter
 from app.models.llm_request import LLMRequest, LLMRequestStatus
 from app.repositories.llm_request_repository import LLMRequestRepository
 from app.repositories.model_repository import ModelRepository
@@ -46,7 +47,9 @@ ChatService = Annotated[ChatCompletionService, Depends(get_chat_service)]
 
 
 @router.post("/completions", response_model=ChatCompletionResponse)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def create_completion(
+    request: Request,
     payload: ChatCompletionRequest,
     session: DbSession,
     current_user: ActiveUser,

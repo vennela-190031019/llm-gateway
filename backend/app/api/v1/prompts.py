@@ -14,6 +14,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, HTTPException, Request, status
 
 from app.core.dependencies import ActiveUser, DbSession
+from app.core.rate_limit import DEFAULT_RATE_LIMIT, limiter
 from app.models.prompt import PromptTemplate, PromptVersion
 from app.repositories.prompt_repository import PromptRepository
 from app.schemas.prompt import (
@@ -38,8 +39,9 @@ router = APIRouter(prefix="/prompts", tags=["prompts"])
 
 
 @router.post("", response_model=PromptTemplateRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def create_template(
-    payload: PromptTemplateCreate, session: DbSession, current_user: ActiveUser
+    request: Request, payload: PromptTemplateCreate, session: DbSession, current_user: ActiveUser
 ) -> PromptTemplate:
     service = PromptService(PromptRepository(session))
     try:
@@ -55,8 +57,13 @@ async def create_template(
 @router.post(
     "/{name}/versions", response_model=PromptVersionRead, status_code=status.HTTP_201_CREATED
 )
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def create_version(
-    name: str, payload: PromptVersionCreate, session: DbSession, _current_user: ActiveUser
+    request: Request,
+    name: str,
+    payload: PromptVersionCreate,
+    session: DbSession,
+    _current_user: ActiveUser,
 ) -> PromptVersion:
     service = PromptService(PromptRepository(session))
     try:
@@ -74,13 +81,17 @@ async def create_version(
 
 
 @router.get("", response_model=list[PromptTemplateRead])
-async def list_templates(session: DbSession, _current_user: ActiveUser) -> list[PromptTemplate]:
+@limiter.limit(DEFAULT_RATE_LIMIT)
+async def list_templates(
+    request: Request, session: DbSession, _current_user: ActiveUser
+) -> list[PromptTemplate]:
     return list(await PromptRepository(session).list_templates())
 
 
 @router.get("/{name}", response_model=PromptTemplateDetailRead)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def get_template(
-    name: str, session: DbSession, _current_user: ActiveUser
+    request: Request, name: str, session: DbSession, _current_user: ActiveUser
 ) -> PromptTemplate:
     template = await PromptRepository(session).get_template_by_name(name)
     if template is None:
@@ -91,6 +102,7 @@ async def get_template(
 
 
 @router.get("/{name}/render", response_model=PromptRenderResponse)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def render_template(
     name: str,
     request: Request,
@@ -126,8 +138,9 @@ async def render_template(
 
 
 @router.patch("/{name}/versions/{version}/activate", response_model=PromptVersionRead)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 async def activate_version(
-    name: str, version: int, session: DbSession, _current_user: ActiveUser
+    request: Request, name: str, version: int, session: DbSession, _current_user: ActiveUser
 ) -> PromptVersion:
     service = PromptService(PromptRepository(session))
     try:

@@ -30,6 +30,17 @@ jobs:
       - name: Type check (mypy)
         run: mypy app
 
+      - name: Audit dependencies for known vulnerabilities (pip-audit)
+        # PYSEC-2026-1325 (the "Minerva" timing attack) is a pure-Python
+        # `ecdsa` package issue, pulled in transitively by python-jose for
+        # ES*-algorithm support; it only affects ECDSA signing/ECDH, and
+        # this app signs JWTs with HS256 (HMAC) via settings.jwt_algorithm,
+        # never touching the vulnerable code path. The ecdsa maintainers
+        # have stated there's no planned fix (side-channel attacks are
+        # explicitly out of scope for the project), so there's no version
+        # to upgrade to — ignored here deliberately, not overlooked.
+        run: pip-audit --ignore-vuln PYSEC-2026-1325
+
       - name: Run tests
         run: pytest --cov=app --cov-report=term-missing
 

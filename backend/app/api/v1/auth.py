@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.dependencies import ActiveUser, DbSession
+from app.core.rate_limit import AUTH_RATE_LIMIT, DEFAULT_RATE_LIMIT, limiter
 from app.core.security import create_access_token
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -23,7 +24,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserCreate, session: DbSession) -> User:
+@limiter.limit(AUTH_RATE_LIMIT)
+async def register(request: Request, payload: UserCreate, session: DbSession) -> User:
     service = AuthService(UserRepository(session))
     try:
         user = await service.register(payload.email, payload.password)
@@ -36,7 +38,9 @@ async def register(payload: UserCreate, session: DbSession) -> User:
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit(AUTH_RATE_LIMIT)
 async def login(
+    request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: DbSession,
 ) -> Token:
@@ -53,5 +57,6 @@ async def login(
 
 
 @router.get("/me", response_model=UserRead)
-async def me(current_user: ActiveUser) -> User:
+@limiter.limit(DEFAULT_RATE_LIMIT)
+async def me(request: Request, current_user: ActiveUser) -> User:
     return current_user
